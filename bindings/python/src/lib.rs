@@ -7,7 +7,7 @@ mod metal;
 
 use core::slice;
 use memmap2::{Mmap, MmapOptions};
-use pyo3::exceptions::{PyException, PyFileNotFoundError, PyIOError, PyPermissionError};
+use pyo3::exceptions::{PyException, PyFileNotFoundError, PyPermissionError};
 use pyo3::prelude::*;
 use pyo3::sync::OnceLockExt;
 use pyo3::types::IntoPyDict;
@@ -677,7 +677,14 @@ impl Open {
                 "No such file or directory: {}",
                 filename.display()
             )),
-            _ => PyIOError::new_err(format!("Unable to open {}: {e}", filename.display())),
+            // Anything else defers to PyO3's own ErrorKind mapping so callers get the
+            // subclass `open()` would raise. Rebuilding the error keeps the path, which
+            // PyO3 drops when it stringifies the original.
+            _ => std::io::Error::new(
+                e.kind(),
+                format!("Unable to open {}: {e}", filename.display()),
+            )
+            .into(),
         })?;
         let device = device.unwrap_or(Device::Cpu);
         if device != Device::Cpu

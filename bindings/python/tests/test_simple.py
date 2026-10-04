@@ -202,6 +202,17 @@ class ErrorsTestCase(unittest.TestCase):
             os.chmod(f.name, original_mode)
             os.remove(f.name)
 
+    @unittest.skipIf(os.name != "posix", "requires POSIX ENOTDIR semantics")
+    def test_not_a_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            regular = os.path.join(tmpdir, "f.safetensors")
+            save_file_pt({"a": torch.zeros((2, 2))}, regular)
+            nested = os.path.join(regular, "nested.safetensors")
+            with self.assertRaises(NotADirectoryError) as ctx:
+                with safe_open(nested, framework="pt"):
+                    pass
+            self.assertIn(nested, str(ctx.exception))
+
 
 class ReadmeTestCase(unittest.TestCase):
     def assertTensorEqual(self, tensors1, tensors2, equality_fn):
